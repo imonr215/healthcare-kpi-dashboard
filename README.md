@@ -12,7 +12,8 @@ Tableau/Power BI context, here built as a dependency-light web app instead).
 > hospital data is used. Generation logic is in
 > [`src/generate_data.py`](src/generate_data.py).
 
-**[Live demo →](#deploying-a-live-link)** (see setup note below — takes 60 seconds on GitHub Pages)
+**[Live demo →](#deploying-a-live-link)**
+https://imonr215.github.io/healthcare-kpi-dashboard/
 
 ## What it shows
 
