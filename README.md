@@ -59,19 +59,6 @@ open index.html        # macOS; on Windows/Linux just double-click it
 
 The dataset is seeded, so this is fully reproducible.
 
-## Deploying a live link
-
-A live, clickable demo is worth far more on a resume than a screenshot.
-Since `index.html` is fully self-contained, GitHub Pages can serve it with
-no configuration:
-
-1. Push this repo to GitHub
-2. Go to **Settings → Pages**
-3. Under "Build and deployment," set **Source: Deploy from a branch**,
-   branch **main**, folder **/ (root)**
-4. Save — GitHub will publish it at
-   `https://<your-username>.github.io/<repo-name>/` within a minute or two
-
 ## Why a web dashboard instead of Tableau/Power BI
 
 Tableau and Power BI are point-and-click tools — they don't produce a file
