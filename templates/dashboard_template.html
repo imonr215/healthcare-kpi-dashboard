@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>St. Aldric General — Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0B1F33;
+    --bg:#EEF2F6;
+    --panel:#FFFFFF;
+    --border:#DCE3EA;
+    --muted:#5B6B7C;
+    --accent:#0F8B8D;
+    --accent-soft:#E3F2F1;
+    --good:#1E8E5A;
+    --warn:#C9762B;
+    --critical:#B23A48;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:'IBM Plex Mono', monospace;}
+  .wrap{max-width:1240px;margin:0 auto;padding:32px 28px 60px;}
+
+  /* ---------- Header ---------- */
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:.14em;
+    color:var(--accent);
+    font-weight:600;
+    text-transform:uppercase;
+  }
+  h1{
+    font-size:28px;
+    line-height:1.2;
+    margin:6px 0 6px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{color:var(--muted); font-size:14.5px; margin:0 0 20px;}
+
+  .pills{display:flex; gap:8px; flex-wrap:wrap;}
+  .pill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    padding:7px 14px;
+    border-radius:99px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--muted);
+    cursor:pointer;
+    transition:all .15s ease;
+    user-select:none;
+  }
+  .pill:hover{border-color:var(--accent); color:var(--ink);}
+  .pill.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  /* ---------- KPI Cards ---------- */
+  .kpi-row{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    gap:14px;
+    margin:24px 0 28px;
+  }
+  .kpi-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-left:4px solid var(--muted);
+    border-radius:8px;
+    padding:14px 14px 12px;
+    opacity:0;
+    transform:translateY(6px);
+    animation:rise .45s ease forwards;
+  }
+  .kpi-card.status-good{border-left-color:var(--good);}
+  .kpi-card.status-warn{border-left-color:var(--warn);}
+  .kpi-card.status-critical{border-left-color:var(--critical);}
+  .kpi-card.status-neutral{border-left-color:#9AA7B4;}
+  @keyframes rise{ to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ .kpi-card{animation:none; opacity:1; transform:none;} }
+
+  .kpi-label{
+    font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin-bottom:8px;
+  }
+  .kpi-value{font-size:25px; font-weight:600; line-height:1;}
+  .kpi-unit{font-size:14px; color:var(--muted); font-weight:500;}
+  .kpi-delta{font-size:12px; margin-top:6px; font-weight:500;}
+  .kpi-delta.up{color:var(--good);}
+  .kpi-delta.down{color:var(--critical);}
+  .kpi-delta.flat{color:var(--muted);}
+  .spark{display:block; margin-top:8px; height:26px; width:100%;}
+
+  /* ---------- Panels ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:18px 20px 14px;
+  }
+  .panel-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:10px; gap:10px; flex-wrap:wrap;
+  }
+  .panel-head h2{font-size:15px; margin:0; font-weight:600;}
+  .panel-sub{font-size:12px; color:var(--muted); font-family:'IBM Plex Mono', monospace;}
+
+  select{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    padding:6px 10px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--ink);
+  }
+
+  .chart-box{position:relative; height:260px;}
+  .insight-grid .chart-box{height:240px;}
+
+  .main-grid{
+    display:grid;
+    grid-template-columns:1.6fr 1fr;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  .trend-panel canvas, .compare-panel canvas{display:block;}
+
+  .insight-panel{margin-bottom:8px;}
+  .insight-grid{
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    gap:24px;
+    align-items:center;
+  }
+  .insight-stat{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:34px; font-weight:600; color:var(--ink); margin:0 0 4px;
+  }
+  .insight-text p{font-size:13.5px; color:var(--muted); line-height:1.55; margin:0 0 14px;}
+  .legend{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:10px 16px;}
+  .legend li{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .swatch{width:9px; height:9px; border-radius:50%; display:inline-block;}
+
+  footer{
+    margin-top:26px; color:var(--muted); font-size:12px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 980px){
+    .kpi-row{grid-template-columns:repeat(3, 1fr);}
+    .main-grid{grid-template-columns:1fr;}
+    .insight-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width: 560px){
+    .kpi-row{grid-template-columns:repeat(2, 1fr);}
+    h1{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Operations Console</div>
+    <h1>St. Aldric General — Hospital Operations Dashboard</h1>
+    <p class="subtitle">Monthly KPI tracking across six departments · Jan 2024 – Dec 2025 · synthetic data</p>
+    <div class="pills" id="deptPills"></div>
+  </header>
+
+  <section class="kpi-row" id="kpiRow"></section>
+
+  <section class="main-grid">
+    <div class="panel trend-panel">
+      <div class="panel-head">
+        <h2>Trend over time</h2>
+        <select id="kpiSelect"></select>
+      </div>
+      <div class="chart-box"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="panel compare-panel">
+      <div class="panel-head">
+        <h2>Department comparison</h2>
+        <span class="panel-sub" id="compareMonthLabel"></span>
+      </div>
+      <div class="chart-box"><canvas id="compareChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel insight-panel">
+    <div class="panel-head"><h2>Operational insight</h2></div>
+    <div class="insight-grid">
+      <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+      <div class="insight-text">
+        <p class="insight-stat" id="insightStat">r = —</p>
+        <p id="insightCopy"></p>
+        <ul class="legend" id="scatterLegend"></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Synthetic dataset generated for portfolio demonstration — not real patient or hospital data.</span>
+    <span>Python · Chart.js · vanilla JS</span>
+  </footer>
+</div>
+
+<script>
+const DATA = /*__DATA_JSON__*/;
+const INSIGHTS = /*__INSIGHTS_JSON__*/;
+
+const DEPT_COLORS = {
+  Emergency:  "#0F8B8D",
+  Cardiology: "#C2484F",
+  Surgery:    "#3F6FA8",
+  Oncology:   "#D98C3D",
+  Pediatrics: "#4FA36B",
+  ICU:        "#7A6FA3",
+};
+const DEPARTMENTS = Object.keys(DEPT_COLORS);
+
+const KPI_DEFS = {
+  admissions:               {label:"Admissions",          unit:"",     agg:"sum",  direction:null,    thresholds:null,        fmt:v=>Math.round(v).toLocaleString()},
+  avg_los_days:             {label:"Avg. Length of Stay",  unit:" days",agg:"wavg", direction:"lower", thresholds:[4,6],        fmt:v=>v.toFixed(1)},
+  readmission_rate_30d:     {label:"30-Day Readmission",   unit:"%",    agg:"wavg", direction:"lower", thresholds:[0.12,0.18], fmt:v=>(v*100).toFixed(1)},
+  bed_occupancy_rate:       {label:"Bed Occupancy",        unit:"%",    agg:"wavg", direction:"lower", thresholds:[85,95],      fmt:v=>v.toFixed(1)},
+  ed_wait_time_minutes:     {label:"Wait Time",            unit:" min", agg:"wavg", direction:"lower", thresholds:[30,50],      fmt:v=>Math.round(v)},
+  patient_satisfaction_score:{label:"Patient Satisfaction",unit:"",     agg:"wavg", direction:"higher",thresholds:[75,85],      fmt:v=>v.toFixed(1)},
+};
+const KPI_ORDER = ["admissions","avg_los_days","readmission_rate_30d","bed_occupancy_rate","ed_wait_time_minutes","patient_satisfaction_score"];
+
+const MONTHS = [...new Set(DATA.map(r=>r.month))].sort();
+let currentDept = "All";
+let currentKpi = "bed_occupancy_rate";
+
+function rowsFor(dept, month){
+  return month
+    ? DATA.filter(r => r.month===month && (dept==="All" || r.department===dept))
+    : DATA.filter(r => dept==="All" || r.department===dept);
+}
+function aggregate(rows, key, agg){
+  if(rows.length===0) return 0;
+  if(agg==="sum") return rows.reduce((s,r)=>s+r[key],0);
+  const totalW = rows.reduce((s,r)=>s+r.admissions,0);
+  if(totalW===0) return 0;
+  return rows.reduce((s,r)=>s+r[key]*r.admissions,0)/totalW;
+}
+function valueAt(dept, key, month){
+  return aggregate(rowsFor(dept, month), key, KPI_DEFS[key].agg);
+}
+function seriesFor(dept, key){
+  return MONTHS.map(m => valueAt(dept, key, m));
+}
+function statusFor(key, value){
+  const def = KPI_DEFS[key];
+  if(!def.thresholds) return "neutral";
+  const [lo, hi] = def.thresholds;
+  if(def.direction==="lower"){
+    if(value<=lo) return "good";
+    if(value<=hi) return "warn";
+    return "critical";
+  } else {
+    if(value>=hi) return "good";
+    if(value>=lo) return "warn";
+    return "critical";
+  }
+}
+function isImprovement(key, delta){
+  if(delta===0) return "flat";
+  const def = KPI_DEFS[key];
+  if(!def.direction) return "flat";
+  const improved = def.direction==="lower" ? delta<0 : delta>0;
+  return improved ? "up" : "down";
+}
+function sparkPoints(values){
+  const w=100, h=26, pad=2;
+  const min=Math.min(...values), max=Math.max(...values);
+  const range = (max-min)||1;
+  return values.map((v,i)=>{
+    const x = pad + (i/(values.length-1||1))*(w-2*pad);
+    const y = h-pad - ((v-min)/range)*(h-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+/* ---------- Render: department pills ---------- */
+function renderPills(){
+  const el = document.getElementById("deptPills");
+  const opts = ["All", ...DEPARTMENTS];
+  el.innerHTML = opts.map(d=>
+    `<button class="pill ${d===currentDept?"active":""}" data-dept="${d}">${d}</button>`
+  ).join("");
+  el.querySelectorAll(".pill").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ currentDept = btn.dataset.dept; renderAll(); });
+  });
+}
+
+/* ---------- Render: KPI cards ---------- */
+function renderKpiCards(){
+  const el = document.getElementById("kpiRow");
+  const latest = MONTHS[MONTHS.length-1];
+  const prev = MONTHS[MONTHS.length-2];
+  el.innerHTML = KPI_ORDER.map((key, idx)=>{
+    const def = KPI_DEFS[key];
+    const val = valueAt(currentDept, key, latest);
+    const prevVal = valueAt(currentDept, key, prev);
+    const delta = val - prevVal;
+    const dir = isImprovement(key, delta);
+    const status = statusFor(key, val);
+    const spark = sparkPoints(seriesFor(currentDept, key).slice(-6));
+    const deltaUnit = key==="readmission_rate_30d" ? (Math.abs(delta)*100).toFixed(1)+" pts"
+                      : key==="admissions" ? Math.round(Math.abs(delta)).toLocaleString()
+                      : Math.abs(delta).toFixed(1) + (def.unit.trim()? " "+def.unit.trim():"");
+    const arrow = dir==="up" ? "▲" : dir==="down" ? "▼" : "—";
+    return `
+      <div class="kpi-card status-${status}" style="animation-delay:${idx*0.05}s">
+        <div class="kpi-label">${def.label}</div>
+        <div class="kpi-value">${def.fmt(val)}<span class="kpi-unit">${def.unit}</span></div>
+        <div class="kpi-delta ${dir}">${arrow} ${deltaUnit} vs prior mo.</div>
+        <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none">
+          <polyline points="${spark}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>`;
+  }).join("");
+}
+
+/* ---------- Charts ---------- */
+let trendChart, compareChart, scatterChart;
+const chartFont = {family:"'IBM Plex Mono', monospace", size:11};
+
+function renderKpiSelect(){
+  const sel = document.getElementById("kpiSelect");
+  sel.innerHTML = KPI_ORDER.map(k=>`<option value="${k}" ${k===currentKpi?"selected":""}>${KPI_DEFS[k].label}</option>`).join("");
+  sel.addEventListener("change", e=>{ currentKpi = e.target.value; renderCharts(); });
+}
+
+function renderTrendChart(){
+  const def = KPI_DEFS[currentKpi];
+  const deptSeries = seriesFor(currentDept, currentKpi);
+  const datasets = [{
+    label: currentDept,
+    data: deptSeries,
+    borderColor: "#0F8B8D",
+    backgroundColor: "rgba(15,139,141,0.08)",
+    borderWidth: 2.5,
+    pointRadius: 0,
+    tension: 0.3,
+    fill: true,
+  }];
+  if(currentDept!=="All"){
+    datasets.push({
+      label:"All departments",
+      data: seriesFor("All", currentKpi),
+      borderColor:"#A9B4BF",
+      borderDash:[4,3],
+      borderWidth:1.5,
+      pointRadius:0,
+      tension:0.3,
+      fill:false,
+    });
+  }
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById("trendChart"), {
+    type:"line",
+    data:{ labels: MONTHS, datasets },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      plugins:{
+        legend:{display: currentDept!=="All", labels:{font:chartFont, boxWidth:10}},
+        tooltip:{callbacks:{label:(ctx)=> ` ${ctx.dataset.label}: ${def.fmt(ctx.parsed.y)}${def.unit}`}}
+      },
+      scales:{
+        x:{ticks:{font:chartFont, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false}},
+        y:{ticks:{font:chartFont, callback:(v)=>def.fmt(v)}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+}
+
+function renderCompareChart(){
+  const def = KPI_DEFS[currentKpi];
+  const latest = MONTHS[MONTHS.length-1];
+  document.getElementById("compareMonthLabel").textContent = latest;
+  const values = DEPARTMENTS.map(d=> valueAt(d, currentKpi, latest));
+  const colors = DEPARTMENTS.map(d=> d===currentDept || currentDept==="All" ? DEPT_COLORS[d] : "#D8DEE5");
+  if(compareChart) compareChart.destroy();
+  compareChart = new Chart(document.getElementById("compareChart"), {
+    type:"bar",
+    data:{ labels: DEPARTMENTS, datasets:[{ data: values, backgroundColor: colors, borderRadius:5, maxBarThickness:36 }] },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> ` ${def.fmt(ctx.parsed.y)}${def.unit}`}}
+      },
+      scales:{
+        x:{ticks:{font:{...chartFont, size:10}}, grid:{display:false}},
+        y:{ticks:{font:chartFont, callback:(v)=>def.fmt(v)}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+}
+
+function renderScatterChart(){
+  const datasets = DEPARTMENTS.map(d=>({
+    label:d,
+    data: DATA.filter(r=>r.department===d).map(r=>({x:r.bed_occupancy_rate, y:r.ed_wait_time_minutes})),
+    backgroundColor: DEPT_COLORS[d] + (currentDept==="All"||currentDept===d ? "CC":"33"),
+    pointRadius: 4,
+  }));
+  if(scatterChart) scatterChart.destroy();
+  scatterChart = new Chart(document.getElementById("scatterChart"), {
+    type:"scatter",
+    data:{ datasets },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(0)}% occ. / ${ctx.parsed.y.toFixed(0)} min`}}
+      },
+      scales:{
+        x:{title:{display:true, text:"Bed occupancy (%)", font:chartFont}, ticks:{font:chartFont}, grid:{color:"#EEF2F6"}},
+        y:{title:{display:true, text:"Wait time (min)", font:chartFont}, ticks:{font:chartFont}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+  document.getElementById("scatterLegend").innerHTML = DEPARTMENTS.map(d=>
+    `<li><span class="swatch" style="background:${DEPT_COLORS[d]}"></span>${d}</li>`
+  ).join("");
+}
+
+function renderInsightCopy(){
+  document.getElementById("insightStat").textContent = `r = ${INSIGHTS.occ_wait_corr.toFixed(2)}`;
+  document.getElementById("insightCopy").textContent =
+    `Bed occupancy and wait time move together (r = ${INSIGHTS.occ_wait_corr.toFixed(2)}); once occupancy climbs past roughly 85%, waits lengthen sharply. ` +
+    `That extra wait is the strongest single driver of patient satisfaction in this dataset (r = ${INSIGHTS.wait_satisfaction_corr.toFixed(2)} with wait time) — ` +
+    `suggesting capacity and flow management, not bedside care quality alone, is the highest-leverage lever for satisfaction scores.`;
+}
+
+function renderCharts(){
+  renderTrendChart();
+  renderCompareChart();
+  renderScatterChart();
+}
+function renderAll(){
+  renderPills();
+  renderKpiCards();
+  renderCharts();
+}
+
+renderKpiSelect();
+renderInsightCopy();
+renderAll();
+</script>
+</body>
+</html>

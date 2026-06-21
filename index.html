@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>St. Aldric General — Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0B1F33;
+    --bg:#EEF2F6;
+    --panel:#FFFFFF;
+    --border:#DCE3EA;
+    --muted:#5B6B7C;
+    --accent:#0F8B8D;
+    --accent-soft:#E3F2F1;
+    --good:#1E8E5A;
+    --warn:#C9762B;
+    --critical:#B23A48;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:'IBM Plex Mono', monospace;}
+  .wrap{max-width:1240px;margin:0 auto;padding:32px 28px 60px;}
+
+  /* ---------- Header ---------- */
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:.14em;
+    color:var(--accent);
+    font-weight:600;
+    text-transform:uppercase;
+  }
+  h1{
+    font-size:28px;
+    line-height:1.2;
+    margin:6px 0 6px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{color:var(--muted); font-size:14.5px; margin:0 0 20px;}
+
+  .pills{display:flex; gap:8px; flex-wrap:wrap;}
+  .pill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    padding:7px 14px;
+    border-radius:99px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--muted);
+    cursor:pointer;
+    transition:all .15s ease;
+    user-select:none;
+  }
+  .pill:hover{border-color:var(--accent); color:var(--ink);}
+  .pill.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  /* ---------- KPI Cards ---------- */
+  .kpi-row{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    gap:14px;
+    margin:24px 0 28px;
+  }
+  .kpi-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-left:4px solid var(--muted);
+    border-radius:8px;
+    padding:14px 14px 12px;
+    opacity:0;
+    transform:translateY(6px);
+    animation:rise .45s ease forwards;
+  }
+  .kpi-card.status-good{border-left-color:var(--good);}
+  .kpi-card.status-warn{border-left-color:var(--warn);}
+  .kpi-card.status-critical{border-left-color:var(--critical);}
+  .kpi-card.status-neutral{border-left-color:#9AA7B4;}
+  @keyframes rise{ to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ .kpi-card{animation:none; opacity:1; transform:none;} }
+
+  .kpi-label{
+    font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin-bottom:8px;
+  }
+  .kpi-value{font-size:25px; font-weight:600; line-height:1;}
+  .kpi-unit{font-size:14px; color:var(--muted); font-weight:500;}
+  .kpi-delta{font-size:12px; margin-top:6px; font-weight:500;}
+  .kpi-delta.up{color:var(--good);}
+  .kpi-delta.down{color:var(--critical);}
+  .kpi-delta.flat{color:var(--muted);}
+  .spark{display:block; margin-top:8px; height:26px; width:100%;}
+
+  /* ---------- Panels ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:18px 20px 14px;
+  }
+  .panel-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:10px; gap:10px; flex-wrap:wrap;
+  }
+  .panel-head h2{font-size:15px; margin:0; font-weight:600;}
+  .panel-sub{font-size:12px; color:var(--muted); font-family:'IBM Plex Mono', monospace;}
+
+  select{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    padding:6px 10px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--ink);
+  }
+
+  .chart-box{position:relative; height:260px;}
+  .insight-grid .chart-box{height:240px;}
+
+  .main-grid{
+    display:grid;
+    grid-template-columns:1.6fr 1fr;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  .trend-panel canvas, .compare-panel canvas{display:block;}
+
+  .insight-panel{margin-bottom:8px;}
+  .insight-grid{
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    gap:24px;
+    align-items:center;
+  }
+  .insight-stat{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:34px; font-weight:600; color:var(--ink); margin:0 0 4px;
+  }
+  .insight-text p{font-size:13.5px; color:var(--muted); line-height:1.55; margin:0 0 14px;}
+  .legend{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:10px 16px;}
+  .legend li{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .swatch{width:9px; height:9px; border-radius:50%; display:inline-block;}
+
+  footer{
+    margin-top:26px; color:var(--muted); font-size:12px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 980px){
+    .kpi-row{grid-template-columns:repeat(3, 1fr);}
+    .main-grid{grid-template-columns:1fr;}
+    .insight-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width: 560px){
+    .kpi-row{grid-template-columns:repeat(2, 1fr);}
+    h1{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Operations Console</div>
+    <h1>St. Aldric General — Hospital Operations Dashboard</h1>
+    <p class="subtitle">Monthly KPI tracking across six departments · Jan 2024 – Dec 2025 · synthetic data</p>
+    <div class="pills" id="deptPills"></div>
+  </header>
+
+  <section class="kpi-row" id="kpiRow"></section>
+
+  <section class="main-grid">
+    <div class="panel trend-panel">
+      <div class="panel-head">
+        <h2>Trend over time</h2>
+        <select id="kpiSelect"></select>
+      </div>
+      <div class="chart-box"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="panel compare-panel">
+      <div class="panel-head">
+        <h2>Department comparison</h2>
+        <span class="panel-sub" id="compareMonthLabel"></span>
+      </div>
+      <div class="chart-box"><canvas id="compareChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel insight-panel">
+    <div class="panel-head"><h2>Operational insight</h2></div>
+    <div class="insight-grid">
+      <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+      <div class="insight-text">
+        <p class="insight-stat" id="insightStat">r = —</p>
+        <p id="insightCopy"></p>
+        <ul class="legend" id="scatterLegend"></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Synthetic dataset generated for portfolio demonstration — not real patient or hospital data.</span>
+    <span>Python · Chart.js · vanilla JS</span>
+  </footer>
+</div>
+
+<script>
+const DATA = [{"month":"2024-01","department":"Emergency","admissions":1049,"discharges":1070,"avg_los_days":2.03,"readmission_rate_30d":0.0793,"bed_occupancy_rate":82.1,"ed_wait_time_minutes":46.8,"patient_satisfaction_score":74.2},{"month":"2024-02","department":"Emergency","admissions":1081,"discharges":1091,"avg_los_days":1.9,"readmission_rate_30d":0.0963,"bed_occupancy_rate":83.8,"ed_wait_time_minutes":54.5,"patient_satisfaction_score":70.6},{"month":"2024-03","department":"Emergency","admissions":953,"discharges":939,"avg_los_days":1.61,"readmission_rate_30d":0.0853,"bed_occupancy_rate":79.8,"ed_wait_time_minutes":42.2,"patient_satisfaction_score":70.9},{"month":"2024-04","department":"Emergency","admissions":850,"discharges":843,"avg_los_days":1.87,"readmission_rate_30d":0.0931,"bed_occupancy_rate":82.8,"ed_wait_time_minutes":41.2,"patient_satisfaction_score":73.9},{"month":"2024-05","department":"Emergency","admissions":763,"discharges":749,"avg_los_days":1.27,"readmission_rate_30d":0.0859,"bed_occupancy_rate":81.4,"ed_wait_time_minutes":46.5,"patient_satisfaction_score":76.5},{"month":"2024-06","department":"Emergency","admissions":661,"discharges":615,"avg_los_days":1.76,"readmission_rate_30d":0.0851,"bed_occupancy_rate":83.0,"ed_wait_time_minutes":53.3,"patient_satisfaction_score":73.0},{"month":"2024-07","department":"Emergency","admissions":618,"discharges":614,"avg_los_days":1.84,"readmission_rate_30d":0.0739,"bed_occupancy_rate":85.0,"ed_wait_time_minutes":56.6,"patient_satisfaction_score":70.9},{"month":"2024-08","department":"Emergency","admissions":782,"discharges":774,"avg_los_days":1.24,"readmission_rate_30d":0.0938,"bed_occupancy_rate":85.0,"ed_wait_time_minutes":55.2,"patient_satisfaction_score":74.1},{"month":"2024-09","department":"Emergency","admissions":763,"discharges":784,"avg_los_days":2.01,"readmission_rate_30d":0.0852,"bed_occupancy_rate":85.1,"ed_wait_time_minutes":54.0,"patient_satisfaction_score":73.1},{"month":"2024-10","department":"Emergency","admissions":809,"discharges":772,"avg_los_days":1.75,"readmission_rate_30d":0.1045,"bed_occupancy_rate":87.6,"ed_wait_time_minutes":54.2,"patient_satisfaction_score":71.0},{"month":"2024-11","department":"Emergency","admissions":982,"discharges":999,"avg_los_days":1.83,"readmission_rate_30d":0.093,"bed_occupancy_rate":88.6,"ed_wait_time_minutes":64.9,"patient_satisfaction_score":69.9},{"month":"2024-12","department":"Emergency","admissions":1008,"discharges":952,"avg_los_days":2.44,"readmission_rate_30d":0.0894,"bed_occupancy_rate":86.5,"ed_wait_time_minutes":60.0,"patient_satisfaction_score":71.4},{"month":"2025-01","department":"Emergency","admissions":1041,"discharges":1027,"avg_los_days":2.1,"readmission_rate_30d":0.0897,"bed_occupancy_rate":89.7,"ed_wait_time_minutes":66.4,"patient_satisfaction_score":70.1},{"month":"2025-02","department":"Emergency","admissions":1053,"discharges":1037,"avg_los_days":2.32,"readmission_rate_30d":0.0954,"bed_occupancy_rate":88.9,"ed_wait_time_minutes":56.4,"patient_satisfaction_score":72.9},{"month":"2025-03","department":"Emergency","admissions":882,"discharges":906,"avg_los_days":1.87,"readmission_rate_30d":0.085,"bed_occupancy_rate":88.2,"ed_wait_time_minutes":71.2,"patient_satisfaction_score":67.8},{"month":"2025-04","department":"Emergency","admissions":833,"discharges":832,"avg_los_days":1.92,"readmission_rate_30d":0.0941,"bed_occupancy_rate":87.5,"ed_wait_time_minutes":63.2,"patient_satisfaction_score":72.3},{"month":"2025-05","department":"Emergency","admissions":721,"discharges":671,"avg_los_days":1.66,"readmission_rate_30d":0.084,"bed_occupancy_rate":88.3,"ed_wait_time_minutes":57.4,"patient_satisfaction_score":74.2},{"month":"2025-06","department":"Emergency","admissions":704,"discharges":699,"avg_los_days":1.39,"readmission_rate_30d":0.0957,"bed_occupancy_rate":84.3,"ed_wait_time_minutes":49.8,"patient_satisfaction_score":74.3},{"month":"2025-07","department":"Emergency","admissions":579,"discharges":549,"avg_los_days":1.06,"readmission_rate_30d":0.1066,"bed_occupancy_rate":86.6,"ed_wait_time_minutes":62.1,"patient_satisfaction_score":71.6},{"month":"2025-08","department":"Emergency","admissions":630,"discharges":614,"avg_los_days":1.9,"readmission_rate_30d":0.0971,"bed_occupancy_rate":88.2,"ed_wait_time_minutes":60.4,"patient_satisfaction_score":69.4},{"month":"2025-09","department":"Emergency","admissions":813,"discharges":791,"avg_los_days":1.64,"readmission_rate_30d":0.0888,"bed_occupancy_rate":88.3,"ed_wait_time_minutes":55.5,"patient_satisfaction_score":75.2},{"month":"2025-10","department":"Emergency","admissions":853,"discharges":874,"avg_los_days":1.8,"readmission_rate_30d":0.0904,"bed_occupancy_rate":89.6,"ed_wait_time_minutes":60.9,"patient_satisfaction_score":71.2},{"month":"2025-11","department":"Emergency","admissions":938,"discharges":910,"avg_los_days":1.61,"readmission_rate_30d":0.0895,"bed_occupancy_rate":94.0,"ed_wait_time_minutes":67.4,"patient_satisfaction_score":66.5},{"month":"2025-12","department":"Emergency","admissions":1038,"discharges":1015,"avg_los_days":1.7,"readmission_rate_30d":0.0971,"bed_occupancy_rate":90.6,"ed_wait_time_minutes":57.1,"patient_satisfaction_score":73.2},{"month":"2024-01","department":"Cardiology","admissions":227,"discharges":226,"avg_los_days":4.71,"readmission_rate_30d":0.2155,"bed_occupancy_rate":87.3,"ed_wait_time_minutes":29.1,"patient_satisfaction_score":78.8},{"month":"2024-02","department":"Cardiology","admissions":212,"discharges":200,"avg_los_days":4.73,"readmission_rate_30d":0.2139,"bed_occupancy_rate":88.6,"ed_wait_time_minutes":29.8,"patient_satisfaction_score":79.9},{"month":"2024-03","department":"Cardiology","admissions":225,"discharges":210,"avg_los_days":4.71,"readmission_rate_30d":0.2111,"bed_occupancy_rate":91.1,"ed_wait_time_minutes":38.8,"patient_satisfaction_score":79.6},{"month":"2024-04","department":"Cardiology","admissions":204,"discharges":202,"avg_los_days":4.84,"readmission_rate_30d":0.2228,"bed_occupancy_rate":88.9,"ed_wait_time_minutes":34.7,"patient_satisfaction_score":81.7},{"month":"2024-05","department":"Cardiology","admissions":210,"discharges":212,"avg_los_days":4.34,"readmission_rate_30d":0.2298,"bed_occupancy_rate":87.2,"ed_wait_time_minutes":33.3,"patient_satisfaction_score":81.6},{"month":"2024-06","department":"Cardiology","admissions":205,"discharges":210,"avg_los_days":4.71,"readmission_rate_30d":0.1983,"bed_occupancy_rate":86.6,"ed_wait_time_minutes":32.3,"patient_satisfaction_score":78.5},{"month":"2024-07","department":"Cardiology","admissions":193,"discharges":195,"avg_los_days":3.89,"readmission_rate_30d":0.1872,"bed_occupancy_rate":90.5,"ed_wait_time_minutes":35.0,"patient_satisfaction_score":79.0},{"month":"2024-08","department":"Cardiology","admissions":196,"discharges":186,"avg_los_days":3.96,"readmission_rate_30d":0.2109,"bed_occupancy_rate":88.7,"ed_wait_time_minutes":24.5,"patient_satisfaction_score":82.9},{"month":"2024-09","department":"Cardiology","admissions":201,"discharges":203,"avg_los_days":4.2,"readmission_rate_30d":0.2054,"bed_occupancy_rate":89.2,"ed_wait_time_minutes":28.7,"patient_satisfaction_score":81.5},{"month":"2024-10","department":"Cardiology","admissions":202,"discharges":188,"avg_los_days":4.68,"readmission_rate_30d":0.2381,"bed_occupancy_rate":89.0,"ed_wait_time_minutes":36.4,"patient_satisfaction_score":79.5},{"month":"2024-11","department":"Cardiology","admissions":218,"discharges":213,"avg_los_days":4.63,"readmission_rate_30d":0.2231,"bed_occupancy_rate":91.9,"ed_wait_time_minutes":37.4,"patient_satisfaction_score":78.1},{"month":"2024-12","department":"Cardiology","admissions":237,"discharges":229,"avg_los_days":4.31,"readmission_rate_30d":0.2063,"bed_occupancy_rate":89.0,"ed_wait_time_minutes":17.8,"patient_satisfaction_score":80.6},{"month":"2025-01","department":"Cardiology","admissions":241,"discharges":242,"avg_los_days":4.61,"readmission_rate_30d":0.2037,"bed_occupancy_rate":95.1,"ed_wait_time_minutes":42.8,"patient_satisfaction_score":77.1},{"month":"2025-02","department":"Cardiology","admissions":224,"discharges":211,"avg_los_days":5.06,"readmission_rate_30d":0.222,"bed_occupancy_rate":93.8,"ed_wait_time_minutes":35.3,"patient_satisfaction_score":79.8},{"month":"2025-03","department":"Cardiology","admissions":211,"discharges":200,"avg_los_days":4.43,"readmission_rate_30d":0.2142,"bed_occupancy_rate":93.6,"ed_wait_time_minutes":33.8,"patient_satisfaction_score":82.8},{"month":"2025-04","department":"Cardiology","admissions":225,"discharges":227,"avg_los_days":4.79,"readmission_rate_30d":0.2208,"bed_occupancy_rate":89.2,"ed_wait_time_minutes":33.8,"patient_satisfaction_score":80.0},{"month":"2025-05","department":"Cardiology","admissions":202,"discharges":192,"avg_los_days":4.38,"readmission_rate_30d":0.2145,"bed_occupancy_rate":96.2,"ed_wait_time_minutes":45.5,"patient_satisfaction_score":76.2},{"month":"2025-06","department":"Cardiology","admissions":212,"discharges":214,"avg_los_days":4.24,"readmission_rate_30d":0.1953,"bed_occupancy_rate":97.2,"ed_wait_time_minutes":49.9,"patient_satisfaction_score":77.2},{"month":"2025-07","department":"Cardiology","admissions":200,"discharges":194,"avg_los_days":4.35,"readmission_rate_30d":0.2145,"bed_occupancy_rate":94.4,"ed_wait_time_minutes":41.2,"patient_satisfaction_score":80.8},{"month":"2025-08","department":"Cardiology","admissions":201,"discharges":195,"avg_los_days":4.2,"readmission_rate_30d":0.2103,"bed_occupancy_rate":98.0,"ed_wait_time_minutes":49.1,"patient_satisfaction_score":75.3},{"month":"2025-09","department":"Cardiology","admissions":198,"discharges":198,"avg_los_days":4.43,"readmission_rate_30d":0.2288,"bed_occupancy_rate":95.0,"ed_wait_time_minutes":40.9,"patient_satisfaction_score":76.9},{"month":"2025-10","department":"Cardiology","admissions":211,"discharges":217,"avg_los_days":4.54,"readmission_rate_30d":0.2085,"bed_occupancy_rate":97.8,"ed_wait_time_minutes":43.0,"patient_satisfaction_score":77.6},{"month":"2025-11","department":"Cardiology","admissions":234,"discharges":220,"avg_los_days":4.9,"readmission_rate_30d":0.2119,"bed_occupancy_rate":97.1,"ed_wait_time_minutes":45.4,"patient_satisfaction_score":73.9},{"month":"2025-12","department":"Cardiology","admissions":229,"discharges":218,"avg_los_days":4.8,"readmission_rate_30d":0.2171,"bed_occupancy_rate":95.4,"ed_wait_time_minutes":44.1,"patient_satisfaction_score":74.0},{"month":"2024-01","department":"Surgery","admissions":246,"discharges":246,"avg_los_days":3.17,"readmission_rate_30d":0.143,"bed_occupancy_rate":87.7,"ed_wait_time_minutes":31.6,"patient_satisfaction_score":84.0},{"month":"2024-02","department":"Surgery","admissions":285,"discharges":276,"avg_los_days":3.25,"readmission_rate_30d":0.1142,"bed_occupancy_rate":85.5,"ed_wait_time_minutes":33.4,"patient_satisfaction_score":84.6},{"month":"2024-03","department":"Surgery","admissions":248,"discharges":243,"avg_los_days":3.27,"readmission_rate_30d":0.1343,"bed_occupancy_rate":85.4,"ed_wait_time_minutes":27.6,"patient_satisfaction_score":84.2},{"month":"2024-04","department":"Surgery","admissions":256,"discharges":254,"avg_los_days":3.45,"readmission_rate_30d":0.1302,"bed_occupancy_rate":87.1,"ed_wait_time_minutes":37.7,"patient_satisfaction_score":83.0},{"month":"2024-05","department":"Surgery","admissions":261,"discharges":246,"avg_los_days":3.5,"readmission_rate_30d":0.1083,"bed_occupancy_rate":84.0,"ed_wait_time_minutes":28.3,"patient_satisfaction_score":85.0},{"month":"2024-06","department":"Surgery","admissions":258,"discharges":253,"avg_los_days":3.31,"readmission_rate_30d":0.1239,"bed_occupancy_rate":88.1,"ed_wait_time_minutes":41.1,"patient_satisfaction_score":81.5},{"month":"2024-07","department":"Surgery","admissions":250,"discharges":244,"avg_los_days":3.39,"readmission_rate_30d":0.1304,"bed_occupancy_rate":85.3,"ed_wait_time_minutes":27.0,"patient_satisfaction_score":81.1},{"month":"2024-08","department":"Surgery","admissions":274,"discharges":273,"avg_los_days":3.67,"readmission_rate_30d":0.1272,"bed_occupancy_rate":88.7,"ed_wait_time_minutes":31.3,"patient_satisfaction_score":81.8},{"month":"2024-09","department":"Surgery","admissions":256,"discharges":253,"avg_los_days":3.04,"readmission_rate_30d":0.1429,"bed_occupancy_rate":87.8,"ed_wait_time_minutes":31.4,"patient_satisfaction_score":85.0},{"month":"2024-10","department":"Surgery","admissions":237,"discharges":234,"avg_los_days":3.44,"readmission_rate_30d":0.1385,"bed_occupancy_rate":87.8,"ed_wait_time_minutes":35.2,"patient_satisfaction_score":82.6},{"month":"2024-11","department":"Surgery","admissions":244,"discharges":237,"avg_los_days":3.6,"readmission_rate_30d":0.1397,"bed_occupancy_rate":85.5,"ed_wait_time_minutes":32.9,"patient_satisfaction_score":83.9},{"month":"2024-12","department":"Surgery","admissions":277,"discharges":273,"avg_los_days":3.33,"readmission_rate_30d":0.1211,"bed_occupancy_rate":93.9,"ed_wait_time_minutes":39.4,"patient_satisfaction_score":83.4},{"month":"2025-01","department":"Surgery","admissions":252,"discharges":245,"avg_los_days":2.98,"readmission_rate_30d":0.1304,"bed_occupancy_rate":91.5,"ed_wait_time_minutes":30.7,"patient_satisfaction_score":84.5},{"month":"2025-02","department":"Surgery","admissions":264,"discharges":270,"avg_los_days":3.27,"readmission_rate_30d":0.1299,"bed_occupancy_rate":90.0,"ed_wait_time_minutes":31.6,"patient_satisfaction_score":80.5},{"month":"2025-03","department":"Surgery","admissions":256,"discharges":244,"avg_los_days":3.08,"readmission_rate_30d":0.1353,"bed_occupancy_rate":92.1,"ed_wait_time_minutes":30.4,"patient_satisfaction_score":82.0},{"month":"2025-04","department":"Surgery","admissions":252,"discharges":248,"avg_los_days":3.61,"readmission_rate_30d":0.13,"bed_occupancy_rate":93.6,"ed_wait_time_minutes":36.2,"patient_satisfaction_score":81.4},{"month":"2025-05","department":"Surgery","admissions":257,"discharges":249,"avg_los_days":3.55,"readmission_rate_30d":0.1348,"bed_occupancy_rate":92.3,"ed_wait_time_minutes":37.5,"patient_satisfaction_score":78.3},{"month":"2025-06","department":"Surgery","admissions":259,"discharges":254,"avg_los_days":3.64,"readmission_rate_30d":0.1262,"bed_occupancy_rate":91.6,"ed_wait_time_minutes":28.8,"patient_satisfaction_score":83.9},{"month":"2025-07","department":"Surgery","admissions":246,"discharges":246,"avg_los_days":3.39,"readmission_rate_30d":0.1508,"bed_occupancy_rate":89.3,"ed_wait_time_minutes":28.0,"patient_satisfaction_score":81.5},{"month":"2025-08","department":"Surgery","admissions":245,"discharges":242,"avg_los_days":3.2,"readmission_rate_30d":0.1293,"bed_occupancy_rate":93.5,"ed_wait_time_minutes":36.2,"patient_satisfaction_score":81.6},{"month":"2025-09","department":"Surgery","admissions":247,"discharges":241,"avg_los_days":2.94,"readmission_rate_30d":0.1607,"bed_occupancy_rate":92.2,"ed_wait_time_minutes":38.7,"patient_satisfaction_score":80.4},{"month":"2025-10","department":"Surgery","admissions":262,"discharges":267,"avg_los_days":3.88,"readmission_rate_30d":0.1263,"bed_occupancy_rate":90.4,"ed_wait_time_minutes":30.1,"patient_satisfaction_score":79.5},{"month":"2025-11","department":"Surgery","admissions":270,"discharges":273,"avg_los_days":3.16,"readmission_rate_30d":0.1225,"bed_occupancy_rate":93.0,"ed_wait_time_minutes":45.0,"patient_satisfaction_score":73.0},{"month":"2025-12","department":"Surgery","admissions":267,"discharges":254,"avg_los_days":3.66,"readmission_rate_30d":0.1266,"bed_occupancy_rate":93.5,"ed_wait_time_minutes":32.8,"patient_satisfaction_score":79.1},{"month":"2024-01","department":"Oncology","admissions":150,"discharges":146,"avg_los_days":5.7,"readmission_rate_30d":0.1896,"bed_occupancy_rate":79.6,"ed_wait_time_minutes":16.2,"patient_satisfaction_score":78.9},{"month":"2024-02","department":"Oncology","admissions":139,"discharges":133,"avg_los_days":5.52,"readmission_rate_30d":0.1996,"bed_occupancy_rate":83.3,"ed_wait_time_minutes":29.1,"patient_satisfaction_score":82.4},{"month":"2024-03","department":"Oncology","admissions":139,"discharges":134,"avg_los_days":5.78,"readmission_rate_30d":0.1935,"bed_occupancy_rate":82.4,"ed_wait_time_minutes":21.7,"patient_satisfaction_score":76.7},{"month":"2024-04","department":"Oncology","admissions":144,"discharges":136,"avg_los_days":5.86,"readmission_rate_30d":0.1991,"bed_occupancy_rate":82.9,"ed_wait_time_minutes":18.3,"patient_satisfaction_score":78.5},{"month":"2024-05","department":"Oncology","admissions":136,"discharges":137,"avg_los_days":5.8,"readmission_rate_30d":0.1853,"bed_occupancy_rate":84.7,"ed_wait_time_minutes":19.5,"patient_satisfaction_score":77.6},{"month":"2024-06","department":"Oncology","admissions":138,"discharges":134,"avg_los_days":5.82,"readmission_rate_30d":0.2039,"bed_occupancy_rate":84.7,"ed_wait_time_minutes":23.6,"patient_satisfaction_score":78.2},{"month":"2024-07","department":"Oncology","admissions":133,"discharges":124,"avg_los_days":5.66,"readmission_rate_30d":0.2036,"bed_occupancy_rate":83.2,"ed_wait_time_minutes":24.1,"patient_satisfaction_score":79.3},{"month":"2024-08","department":"Oncology","admissions":139,"discharges":140,"avg_los_days":5.94,"readmission_rate_30d":0.1829,"bed_occupancy_rate":86.6,"ed_wait_time_minutes":29.6,"patient_satisfaction_score":78.8},{"month":"2024-09","department":"Oncology","admissions":143,"discharges":146,"avg_los_days":5.74,"readmission_rate_30d":0.211,"bed_occupancy_rate":86.9,"ed_wait_time_minutes":30.0,"patient_satisfaction_score":74.8},{"month":"2024-10","department":"Oncology","admissions":144,"discharges":137,"avg_los_days":6.05,"readmission_rate_30d":0.2066,"bed_occupancy_rate":83.7,"ed_wait_time_minutes":28.2,"patient_satisfaction_score":78.1},{"month":"2024-11","department":"Oncology","admissions":122,"discharges":125,"avg_los_days":5.43,"readmission_rate_30d":0.1886,"bed_occupancy_rate":85.8,"ed_wait_time_minutes":33.0,"patient_satisfaction_score":76.8},{"month":"2024-12","department":"Oncology","admissions":142,"discharges":141,"avg_los_days":6.2,"readmission_rate_30d":0.2033,"bed_occupancy_rate":86.9,"ed_wait_time_minutes":23.3,"patient_satisfaction_score":77.5},{"month":"2025-01","department":"Oncology","admissions":143,"discharges":145,"avg_los_days":5.83,"readmission_rate_30d":0.2169,"bed_occupancy_rate":86.3,"ed_wait_time_minutes":27.8,"patient_satisfaction_score":80.1},{"month":"2025-02","department":"Oncology","admissions":144,"discharges":140,"avg_los_days":5.9,"readmission_rate_30d":0.2017,"bed_occupancy_rate":88.7,"ed_wait_time_minutes":27.5,"patient_satisfaction_score":74.8},{"month":"2025-03","department":"Oncology","admissions":144,"discharges":134,"avg_los_days":5.88,"readmission_rate_30d":0.1855,"bed_occupancy_rate":87.8,"ed_wait_time_minutes":27.8,"patient_satisfaction_score":76.6},{"month":"2025-04","department":"Oncology","admissions":124,"discharges":119,"avg_los_days":6.02,"readmission_rate_30d":0.2108,"bed_occupancy_rate":87.8,"ed_wait_time_minutes":30.4,"patient_satisfaction_score":79.7},{"month":"2025-05","department":"Oncology","admissions":121,"discharges":119,"avg_los_days":5.94,"readmission_rate_30d":0.2149,"bed_occupancy_rate":92.3,"ed_wait_time_minutes":42.8,"patient_satisfaction_score":75.4},{"month":"2025-06","department":"Oncology","admissions":142,"discharges":141,"avg_los_days":5.67,"readmission_rate_30d":0.2066,"bed_occupancy_rate":91.3,"ed_wait_time_minutes":44.9,"patient_satisfaction_score":74.3},{"month":"2025-07","department":"Oncology","admissions":140,"discharges":139,"avg_los_days":6.14,"readmission_rate_30d":0.2071,"bed_occupancy_rate":92.7,"ed_wait_time_minutes":34.0,"patient_satisfaction_score":75.8},{"month":"2025-08","department":"Oncology","admissions":139,"discharges":143,"avg_los_days":6.06,"readmission_rate_30d":0.1898,"bed_occupancy_rate":88.8,"ed_wait_time_minutes":33.6,"patient_satisfaction_score":75.8},{"month":"2025-09","department":"Oncology","admissions":129,"discharges":126,"avg_los_days":5.92,"readmission_rate_30d":0.2143,"bed_occupancy_rate":90.0,"ed_wait_time_minutes":38.6,"patient_satisfaction_score":75.5},{"month":"2025-10","department":"Oncology","admissions":148,"discharges":139,"avg_los_days":5.59,"readmission_rate_30d":0.2112,"bed_occupancy_rate":90.0,"ed_wait_time_minutes":37.0,"patient_satisfaction_score":76.9},{"month":"2025-11","department":"Oncology","admissions":134,"discharges":131,"avg_los_days":5.71,"readmission_rate_30d":0.2202,"bed_occupancy_rate":90.5,"ed_wait_time_minutes":32.8,"patient_satisfaction_score":79.6},{"month":"2025-12","department":"Oncology","admissions":156,"discharges":159,"avg_los_days":5.82,"readmission_rate_30d":0.2122,"bed_occupancy_rate":94.8,"ed_wait_time_minutes":41.1,"patient_satisfaction_score":72.3},{"month":"2024-01","department":"Pediatrics","admissions":258,"discharges":261,"avg_los_days":2.39,"readmission_rate_30d":0.0602,"bed_occupancy_rate":72.8,"ed_wait_time_minutes":21.0,"patient_satisfaction_score":86.3},{"month":"2024-02","department":"Pediatrics","admissions":246,"discharges":233,"avg_los_days":2.71,"readmission_rate_30d":0.0764,"bed_occupancy_rate":76.5,"ed_wait_time_minutes":14.0,"patient_satisfaction_score":87.2},{"month":"2024-03","department":"Pediatrics","admissions":214,"discharges":211,"avg_los_days":2.44,"readmission_rate_30d":0.072,"bed_occupancy_rate":74.8,"ed_wait_time_minutes":17.0,"patient_satisfaction_score":89.5},{"month":"2024-04","department":"Pediatrics","admissions":175,"discharges":171,"avg_los_days":2.21,"readmission_rate_30d":0.1116,"bed_occupancy_rate":76.9,"ed_wait_time_minutes":17.5,"patient_satisfaction_score":89.6},{"month":"2024-05","department":"Pediatrics","admissions":176,"discharges":171,"avg_los_days":2.06,"readmission_rate_30d":0.0962,"bed_occupancy_rate":75.8,"ed_wait_time_minutes":21.0,"patient_satisfaction_score":86.9},{"month":"2024-06","department":"Pediatrics","admissions":151,"discharges":153,"avg_los_days":2.18,"readmission_rate_30d":0.0903,"bed_occupancy_rate":71.1,"ed_wait_time_minutes":20.9,"patient_satisfaction_score":87.6},{"month":"2024-07","department":"Pediatrics","admissions":128,"discharges":123,"avg_los_days":1.91,"readmission_rate_30d":0.0622,"bed_occupancy_rate":75.6,"ed_wait_time_minutes":14.7,"patient_satisfaction_score":87.3},{"month":"2024-08","department":"Pediatrics","admissions":127,"discharges":125,"avg_los_days":1.46,"readmission_rate_30d":0.0975,"bed_occupancy_rate":76.0,"ed_wait_time_minutes":23.0,"patient_satisfaction_score":92.4},{"month":"2024-09","department":"Pediatrics","admissions":157,"discharges":148,"avg_los_days":1.93,"readmission_rate_30d":0.0689,"bed_occupancy_rate":75.5,"ed_wait_time_minutes":18.4,"patient_satisfaction_score":83.6},{"month":"2024-10","department":"Pediatrics","admissions":193,"discharges":188,"avg_los_days":2.37,"readmission_rate_30d":0.0824,"bed_occupancy_rate":77.0,"ed_wait_time_minutes":17.7,"patient_satisfaction_score":86.8},{"month":"2024-11","department":"Pediatrics","admissions":217,"discharges":207,"avg_los_days":2.44,"readmission_rate_30d":0.1063,"bed_occupancy_rate":82.2,"ed_wait_time_minutes":27.4,"patient_satisfaction_score":89.1},{"month":"2024-12","department":"Pediatrics","admissions":241,"discharges":232,"avg_los_days":2.55,"readmission_rate_30d":0.0838,"bed_occupancy_rate":79.0,"ed_wait_time_minutes":18.4,"patient_satisfaction_score":87.0},{"month":"2025-01","department":"Pediatrics","admissions":256,"discharges":262,"avg_los_days":2.51,"readmission_rate_30d":0.1124,"bed_occupancy_rate":80.0,"ed_wait_time_minutes":16.9,"patient_satisfaction_score":89.2},{"month":"2025-02","department":"Pediatrics","admissions":254,"discharges":260,"avg_los_days":2.51,"readmission_rate_30d":0.0964,"bed_occupancy_rate":80.8,"ed_wait_time_minutes":19.8,"patient_satisfaction_score":91.4},{"month":"2025-03","department":"Pediatrics","admissions":217,"discharges":205,"avg_los_days":2.32,"readmission_rate_30d":0.1037,"bed_occupancy_rate":76.7,"ed_wait_time_minutes":15.0,"patient_satisfaction_score":86.8},{"month":"2025-04","department":"Pediatrics","admissions":196,"discharges":200,"avg_los_days":2.65,"readmission_rate_30d":0.0674,"bed_occupancy_rate":81.2,"ed_wait_time_minutes":18.6,"patient_satisfaction_score":86.5},{"month":"2025-05","department":"Pediatrics","admissions":162,"discharges":162,"avg_los_days":1.63,"readmission_rate_30d":0.0822,"bed_occupancy_rate":76.9,"ed_wait_time_minutes":15.1,"patient_satisfaction_score":88.8},{"month":"2025-06","department":"Pediatrics","admissions":135,"discharges":139,"avg_los_days":1.99,"readmission_rate_30d":0.0687,"bed_occupancy_rate":78.1,"ed_wait_time_minutes":13.9,"patient_satisfaction_score":85.3},{"month":"2025-07","department":"Pediatrics","admissions":128,"discharges":124,"avg_los_days":1.51,"readmission_rate_30d":0.0959,"bed_occupancy_rate":79.4,"ed_wait_time_minutes":19.6,"patient_satisfaction_score":88.2},{"month":"2025-08","department":"Pediatrics","admissions":138,"discharges":139,"avg_los_days":2.35,"readmission_rate_30d":0.093,"bed_occupancy_rate":80.9,"ed_wait_time_minutes":21.3,"patient_satisfaction_score":84.8},{"month":"2025-09","department":"Pediatrics","admissions":155,"discharges":149,"avg_los_days":2.2,"readmission_rate_30d":0.072,"bed_occupancy_rate":84.1,"ed_wait_time_minutes":25.0,"patient_satisfaction_score":85.3},{"month":"2025-10","department":"Pediatrics","admissions":174,"discharges":174,"avg_los_days":2.28,"readmission_rate_30d":0.0801,"bed_occupancy_rate":82.4,"ed_wait_time_minutes":18.9,"patient_satisfaction_score":89.2},{"month":"2025-11","department":"Pediatrics","admissions":216,"discharges":206,"avg_los_days":2.69,"readmission_rate_30d":0.12,"bed_occupancy_rate":81.5,"ed_wait_time_minutes":18.3,"patient_satisfaction_score":86.2},{"month":"2025-12","department":"Pediatrics","admissions":255,"discharges":262,"avg_los_days":2.44,"readmission_rate_30d":0.0892,"bed_occupancy_rate":82.5,"ed_wait_time_minutes":17.6,"patient_satisfaction_score":87.0},{"month":"2024-01","department":"ICU","admissions":95,"discharges":98,"avg_los_days":7.4,"readmission_rate_30d":0.1518,"bed_occupancy_rate":91.1,"ed_wait_time_minutes":27.7,"patient_satisfaction_score":73.7},{"month":"2024-02","department":"ICU","admissions":107,"discharges":103,"avg_los_days":7.44,"readmission_rate_30d":0.1398,"bed_occupancy_rate":92.9,"ed_wait_time_minutes":36.0,"patient_satisfaction_score":70.2},{"month":"2024-03","department":"ICU","admissions":96,"discharges":90,"avg_los_days":7.41,"readmission_rate_30d":0.1647,"bed_occupancy_rate":91.1,"ed_wait_time_minutes":40.0,"patient_satisfaction_score":71.2},{"month":"2024-04","department":"ICU","admissions":94,"discharges":90,"avg_los_days":7.39,"readmission_rate_30d":0.1452,"bed_occupancy_rate":92.0,"ed_wait_time_minutes":38.7,"patient_satisfaction_score":75.2},{"month":"2024-05","department":"ICU","admissions":88,"discharges":84,"avg_los_days":6.98,"readmission_rate_30d":0.1519,"bed_occupancy_rate":92.6,"ed_wait_time_minutes":44.0,"patient_satisfaction_score":72.1},{"month":"2024-06","department":"ICU","admissions":91,"discharges":88,"avg_los_days":7.16,"readmission_rate_30d":0.1772,"bed_occupancy_rate":94.0,"ed_wait_time_minutes":41.5,"patient_satisfaction_score":71.9},{"month":"2024-07","department":"ICU","admissions":94,"discharges":88,"avg_los_days":6.87,"readmission_rate_30d":0.158,"bed_occupancy_rate":94.3,"ed_wait_time_minutes":38.9,"patient_satisfaction_score":72.6},{"month":"2024-08","department":"ICU","admissions":85,"discharges":79,"avg_los_days":6.91,"readmission_rate_30d":0.1392,"bed_occupancy_rate":93.4,"ed_wait_time_minutes":43.3,"patient_satisfaction_score":69.2},{"month":"2024-09","department":"ICU","admissions":89,"discharges":87,"avg_los_days":6.78,"readmission_rate_30d":0.1555,"bed_occupancy_rate":92.0,"ed_wait_time_minutes":42.3,"patient_satisfaction_score":77.0},{"month":"2024-10","department":"ICU","admissions":105,"discharges":102,"avg_los_days":7.39,"readmission_rate_30d":0.1552,"bed_occupancy_rate":94.7,"ed_wait_time_minutes":48.5,"patient_satisfaction_score":67.2},{"month":"2024-11","department":"ICU","admissions":105,"discharges":103,"avg_los_days":7.7,"readmission_rate_30d":0.1564,"bed_occupancy_rate":93.9,"ed_wait_time_minutes":41.5,"patient_satisfaction_score":73.2},{"month":"2024-12","department":"ICU","admissions":103,"discharges":97,"avg_los_days":7.33,"readmission_rate_30d":0.129,"bed_occupancy_rate":97.3,"ed_wait_time_minutes":48.8,"patient_satisfaction_score":69.7},{"month":"2025-01","department":"ICU","admissions":105,"discharges":102,"avg_los_days":7.39,"readmission_rate_30d":0.1465,"bed_occupancy_rate":95.8,"ed_wait_time_minutes":48.6,"patient_satisfaction_score":66.8},{"month":"2025-02","department":"ICU","admissions":109,"discharges":108,"avg_los_days":7.18,"readmission_rate_30d":0.1705,"bed_occupancy_rate":96.3,"ed_wait_time_minutes":38.2,"patient_satisfaction_score":70.8},{"month":"2025-03","department":"ICU","admissions":104,"discharges":107,"avg_los_days":7.24,"readmission_rate_30d":0.1607,"bed_occupancy_rate":98.0,"ed_wait_time_minutes":43.8,"patient_satisfaction_score":70.9},{"month":"2025-04","department":"ICU","admissions":95,"discharges":89,"avg_los_days":7.08,"readmission_rate_30d":0.1571,"bed_occupancy_rate":96.9,"ed_wait_time_minutes":42.5,"patient_satisfaction_score":69.7},{"month":"2025-05","department":"ICU","admissions":96,"discharges":98,"avg_los_days":7.27,"readmission_rate_30d":0.1711,"bed_occupancy_rate":98.1,"ed_wait_time_minutes":57.2,"patient_satisfaction_score":65.9},{"month":"2025-06","department":"ICU","admissions":91,"discharges":87,"avg_los_days":7.4,"readmission_rate_30d":0.1775,"bed_occupancy_rate":93.8,"ed_wait_time_minutes":35.7,"patient_satisfaction_score":74.1},{"month":"2025-07","department":"ICU","admissions":89,"discharges":88,"avg_los_days":6.88,"readmission_rate_30d":0.163,"bed_occupancy_rate":98.8,"ed_wait_time_minutes":47.8,"patient_satisfaction_score":71.5},{"month":"2025-08","department":"ICU","admissions":76,"discharges":76,"avg_los_days":6.68,"readmission_rate_30d":0.1694,"bed_occupancy_rate":97.7,"ed_wait_time_minutes":42.3,"patient_satisfaction_score":71.3},{"month":"2025-09","department":"ICU","admissions":86,"discharges":82,"avg_los_days":6.66,"readmission_rate_30d":0.158,"bed_occupancy_rate":99.5,"ed_wait_time_minutes":53.8,"patient_satisfaction_score":67.6},{"month":"2025-10","department":"ICU","admissions":100,"discharges":94,"avg_los_days":7.18,"readmission_rate_30d":0.1656,"bed_occupancy_rate":101.1,"ed_wait_time_minutes":50.3,"patient_satisfaction_score":67.6},{"month":"2025-11","department":"ICU","admissions":99,"discharges":93,"avg_los_days":7.12,"readmission_rate_30d":0.1715,"bed_occupancy_rate":99.1,"ed_wait_time_minutes":50.6,"patient_satisfaction_score":66.8},{"month":"2025-12","department":"ICU","admissions":105,"discharges":101,"avg_los_days":7.35,"readmission_rate_30d":0.1838,"bed_occupancy_rate":101.0,"ed_wait_time_minutes":59.6,"patient_satisfaction_score":68.6}];
+const INSIGHTS = {"occ_wait_corr": 0.5748, "wait_satisfaction_corr": -0.8095};
+
+const DEPT_COLORS = {
+  Emergency:  "#0F8B8D",
+  Cardiology: "#C2484F",
+  Surgery:    "#3F6FA8",
+  Oncology:   "#D98C3D",
+  Pediatrics: "#4FA36B",
+  ICU:        "#7A6FA3",
+};
+const DEPARTMENTS = Object.keys(DEPT_COLORS);
+
+const KPI_DEFS = {
+  admissions:               {label:"Admissions",          unit:"",     agg:"sum",  direction:null,    thresholds:null,        fmt:v=>Math.round(v).toLocaleString()},
+  avg_los_days:             {label:"Avg. Length of Stay",  unit:" days",agg:"wavg", direction:"lower", thresholds:[4,6],        fmt:v=>v.toFixed(1)},
+  readmission_rate_30d:     {label:"30-Day Readmission",   unit:"%",    agg:"wavg", direction:"lower", thresholds:[0.12,0.18], fmt:v=>(v*100).toFixed(1)},
+  bed_occupancy_rate:       {label:"Bed Occupancy",        unit:"%",    agg:"wavg", direction:"lower", thresholds:[85,95],      fmt:v=>v.toFixed(1)},
+  ed_wait_time_minutes:     {label:"Wait Time",            unit:" min", agg:"wavg", direction:"lower", thresholds:[30,50],      fmt:v=>Math.round(v)},
+  patient_satisfaction_score:{label:"Patient Satisfaction",unit:"",     agg:"wavg", direction:"higher",thresholds:[75,85],      fmt:v=>v.toFixed(1)},
+};
+const KPI_ORDER = ["admissions","avg_los_days","readmission_rate_30d","bed_occupancy_rate","ed_wait_time_minutes","patient_satisfaction_score"];
+
+const MONTHS = [...new Set(DATA.map(r=>r.month))].sort();
+let currentDept = "All";
+let currentKpi = "bed_occupancy_rate";
+
+function rowsFor(dept, month){
+  return month
+    ? DATA.filter(r => r.month===month && (dept==="All" || r.department===dept))
+    : DATA.filter(r => dept==="All" || r.department===dept);
+}
+function aggregate(rows, key, agg){
+  if(rows.length===0) return 0;
+  if(agg==="sum") return rows.reduce((s,r)=>s+r[key],0);
+  const totalW = rows.reduce((s,r)=>s+r.admissions,0);
+  if(totalW===0) return 0;
+  return rows.reduce((s,r)=>s+r[key]*r.admissions,0)/totalW;
+}
+function valueAt(dept, key, month){
+  return aggregate(rowsFor(dept, month), key, KPI_DEFS[key].agg);
+}
+function seriesFor(dept, key){
+  return MONTHS.map(m => valueAt(dept, key, m));
+}
+function statusFor(key, value){
+  const def = KPI_DEFS[key];
+  if(!def.thresholds) return "neutral";
+  const [lo, hi] = def.thresholds;
+  if(def.direction==="lower"){
+    if(value<=lo) return "good";
+    if(value<=hi) return "warn";
+    return "critical";
+  } else {
+    if(value>=hi) return "good";
+    if(value>=lo) return "warn";
+    return "critical";
+  }
+}
+function isImprovement(key, delta){
+  if(delta===0) return "flat";
+  const def = KPI_DEFS[key];
+  if(!def.direction) return "flat";
+  const improved = def.direction==="lower" ? delta<0 : delta>0;
+  return improved ? "up" : "down";
+}
+function sparkPoints(values){
+  const w=100, h=26, pad=2;
+  const min=Math.min(...values), max=Math.max(...values);
+  const range = (max-min)||1;
+  return values.map((v,i)=>{
+    const x = pad + (i/(values.length-1||1))*(w-2*pad);
+    const y = h-pad - ((v-min)/range)*(h-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+/* ---------- Render: department pills ---------- */
+function renderPills(){
+  const el = document.getElementById("deptPills");
+  const opts = ["All", ...DEPARTMENTS];
+  el.innerHTML = opts.map(d=>
+    `<button class="pill ${d===currentDept?"active":""}" data-dept="${d}">${d}</button>`
+  ).join("");
+  el.querySelectorAll(".pill").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ currentDept = btn.dataset.dept; renderAll(); });
+  });
+}
+
+/* ---------- Render: KPI cards ---------- */
+function renderKpiCards(){
+  const el = document.getElementById("kpiRow");
+  const latest = MONTHS[MONTHS.length-1];
+  const prev = MONTHS[MONTHS.length-2];
+  el.innerHTML = KPI_ORDER.map((key, idx)=>{
+    const def = KPI_DEFS[key];
+    const val = valueAt(currentDept, key, latest);
+    const prevVal = valueAt(currentDept, key, prev);
+    const delta = val - prevVal;
+    const dir = isImprovement(key, delta);
+    const status = statusFor(key, val);
+    const spark = sparkPoints(seriesFor(currentDept, key).slice(-6));
+    const deltaUnit = key==="readmission_rate_30d" ? (Math.abs(delta)*100).toFixed(1)+" pts"
+                      : key==="admissions" ? Math.round(Math.abs(delta)).toLocaleString()
+                      : Math.abs(delta).toFixed(1) + (def.unit.trim()? " "+def.unit.trim():"");
+    const arrow = dir==="up" ? "▲" : dir==="down" ? "▼" : "—";
+    return `
+      <div class="kpi-card status-${status}" style="animation-delay:${idx*0.05}s">
+        <div class="kpi-label">${def.label}</div>
+        <div class="kpi-value">${def.fmt(val)}<span class="kpi-unit">${def.unit}</span></div>
+        <div class="kpi-delta ${dir}">${arrow} ${deltaUnit} vs prior mo.</div>
+        <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none">
+          <polyline points="${spark}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>`;
+  }).join("");
+}
+
+/* ---------- Charts ---------- */
+let trendChart, compareChart, scatterChart;
+const chartFont = {family:"'IBM Plex Mono', monospace", size:11};
+
+function renderKpiSelect(){
+  const sel = document.getElementById("kpiSelect");
+  sel.innerHTML = KPI_ORDER.map(k=>`<option value="${k}" ${k===currentKpi?"selected":""}>${KPI_DEFS[k].label}</option>`).join("");
+  sel.addEventListener("change", e=>{ currentKpi = e.target.value; renderCharts(); });
+}
+
+function renderTrendChart(){
+  const def = KPI_DEFS[currentKpi];
+  const deptSeries = seriesFor(currentDept, currentKpi);
+  const datasets = [{
+    label: currentDept,
+    data: deptSeries,
+    borderColor: "#0F8B8D",
+    backgroundColor: "rgba(15,139,141,0.08)",
+    borderWidth: 2.5,
+    pointRadius: 0,
+    tension: 0.3,
+    fill: true,
+  }];
+  if(currentDept!=="All"){
+    datasets.push({
+      label:"All departments",
+      data: seriesFor("All", currentKpi),
+      borderColor:"#A9B4BF",
+      borderDash:[4,3],
+      borderWidth:1.5,
+      pointRadius:0,
+      tension:0.3,
+      fill:false,
+    });
+  }
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById("trendChart"), {
+    type:"line",
+    data:{ labels: MONTHS, datasets },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      plugins:{
+        legend:{display: currentDept!=="All", labels:{font:chartFont, boxWidth:10}},
+        tooltip:{callbacks:{label:(ctx)=> ` ${ctx.dataset.label}: ${def.fmt(ctx.parsed.y)}${def.unit}`}}
+      },
+      scales:{
+        x:{ticks:{font:chartFont, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false}},
+        y:{ticks:{font:chartFont, callback:(v)=>def.fmt(v)}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+}
+
+function renderCompareChart(){
+  const def = KPI_DEFS[currentKpi];
+  const latest = MONTHS[MONTHS.length-1];
+  document.getElementById("compareMonthLabel").textContent = latest;
+  const values = DEPARTMENTS.map(d=> valueAt(d, currentKpi, latest));
+  const colors = DEPARTMENTS.map(d=> d===currentDept || currentDept==="All" ? DEPT_COLORS[d] : "#D8DEE5");
+  if(compareChart) compareChart.destroy();
+  compareChart = new Chart(document.getElementById("compareChart"), {
+    type:"bar",
+    data:{ labels: DEPARTMENTS, datasets:[{ data: values, backgroundColor: colors, borderRadius:5, maxBarThickness:36 }] },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> ` ${def.fmt(ctx.parsed.y)}${def.unit}`}}
+      },
+      scales:{
+        x:{ticks:{font:{...chartFont, size:10}}, grid:{display:false}},
+        y:{ticks:{font:chartFont, callback:(v)=>def.fmt(v)}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+}
+
+function renderScatterChart(){
+  const datasets = DEPARTMENTS.map(d=>({
+    label:d,
+    data: DATA.filter(r=>r.department===d).map(r=>({x:r.bed_occupancy_rate, y:r.ed_wait_time_minutes})),
+    backgroundColor: DEPT_COLORS[d] + (currentDept==="All"||currentDept===d ? "CC":"33"),
+    pointRadius: 4,
+  }));
+  if(scatterChart) scatterChart.destroy();
+  scatterChart = new Chart(document.getElementById("scatterChart"), {
+    type:"scatter",
+    data:{ datasets },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(0)}% occ. / ${ctx.parsed.y.toFixed(0)} min`}}
+      },
+      scales:{
+        x:{title:{display:true, text:"Bed occupancy (%)", font:chartFont}, ticks:{font:chartFont}, grid:{color:"#EEF2F6"}},
+        y:{title:{display:true, text:"Wait time (min)", font:chartFont}, ticks:{font:chartFont}, grid:{color:"#EEF2F6"}}
+      }
+    }
+  });
+  document.getElementById("scatterLegend").innerHTML = DEPARTMENTS.map(d=>
+    `<li><span class="swatch" style="background:${DEPT_COLORS[d]}"></span>${d}</li>`
+  ).join("");
+}
+
+function renderInsightCopy(){
+  document.getElementById("insightStat").textContent = `r = ${INSIGHTS.occ_wait_corr.toFixed(2)}`;
+  document.getElementById("insightCopy").textContent =
+    `Bed occupancy and wait time move together (r = ${INSIGHTS.occ_wait_corr.toFixed(2)}); once occupancy climbs past roughly 85%, waits lengthen sharply. ` +
+    `That extra wait is the strongest single driver of patient satisfaction in this dataset (r = ${INSIGHTS.wait_satisfaction_corr.toFixed(2)} with wait time) — ` +
+    `suggesting capacity and flow management, not bedside care quality alone, is the highest-leverage lever for satisfaction scores.`;
+}
+
+function renderCharts(){
+  renderTrendChart();
+  renderCompareChart();
+  renderScatterChart();
+}
+function renderAll(){
+  renderPills();
+  renderKpiCards();
+  renderCharts();
+}
+
+renderKpiSelect();
+renderInsightCopy();
+renderAll();
+</script>
+</body>
+</html>
